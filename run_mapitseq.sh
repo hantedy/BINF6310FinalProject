@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# MAPIT-seq Full Pipeline Script (Fixed)
+
+# Make sure you are in the 'mapit_env' conda environment
+
+MAPIT_BIN="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/MAPIT-seq/Mapit"
+OUTPUT_DIR="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT_output"
+CONFIG_FILE="$OUTPUT_DIR/GRCh38.json"
+FASTQ_DIR="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/example/fastq_samples"
+RNA_STRAND="FR"  # Adjust if needed
+
+# Step 1: Configure MAPIT
+
+$MAPIT_BIN config 
+-v GRCh38 
+-s human 
+-f /Users/hanchoi/PycharmProjects/BINF6310FinalProject/GRCh38.p13.genome.fa 
+-E /Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/reference/ERCC/ERCC92.fa 
+-o $OUTPUT_DIR 
+-a /Users/hanchoi/PycharmProjects/BINF6310FinalProject/gencode.v40.chr_patch_hapl_scaff.annotation.gff3 
+-r /Users/hanchoi/PycharmProjects/BINF6310FinalProject/rmsk.txt 
+--dbSNP /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/All_20180418.vcf.gz 
+--1000Genomes /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/1000genomes_split_chr 
+--EVSEVA /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/EVS_split_chr 
+--Reditools /Users/hanchoi/PycharmProjects/BINF6310FinalProject/REDItools2 
+--FLARE /Users/hanchoi/PycharmProjects/BINF6310FinalProject/FLARE 
+--overwrite
+
+# Step 2: Prepare genome & annotation
+
+$MAPIT_BIN prepare 
+-v GRCh38 
+-n "GENOME" 
+-r "REP1" 
+-o $OUTPUT_DIR
+
+# Step 3: Map sequencing reads for all FASTQ samples
+
+for fq in $FASTQ_DIR/*.fastq; do
+SAMPLE=$(basename $fq .fastq)
+$MAPIT_BIN mapping 
+-v GRCh38 
+--fq $fq 
+--rna-strandness $RNA_STRAND 
+-n $SAMPLE 
+-r REP1 
+-o $OUTPUT_DIR
+done
+
+# Step 4: Call RNA editing for all samples
+
+$MAPIT_BIN callediting 
+-v GRCh38 
+--sampleList $FASTQ_DIR/sample_list.txt 
+-o $OUTPUT_DIR 
+--prefix "MAPIT" 
+-e Both
+
+# Step 5: Call targets
+
+$MAPIT_BIN calltargets 
+-v GRCh38 
+-i $OUTPUT_DIR/MAPIT_edits.tsv 
+-l Both 
+--treatName TREAT 
+--controlName CONTROL 
+-o $OUTPUT_DIR
+
+# Step 6: Optional FLARE analysis for all samples
+
+for fq in $FASTQ_DIR/*.fastq; do
+SAMPLE=$(basename $fq .fastq)
+$MAPIT_BIN FLARE 
+-v GRCh38 
+-n $SAMPLE 
+-r REP1 
+--regions $OUTPUT_DIR/MAPIT_targets.bed 
+-o $OUTPUT_DIR 
+-e AG
+done
+

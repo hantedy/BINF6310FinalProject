@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# MAPIT-seq Full Pipeline Script (Auto-Permissions Enabled)
+
+MAPIT_BIN="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/MAPIT-seq/Mapit"
+OUTPUT_DIR="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT_output"
+CONFIG_FILE="$OUTPUT_DIR/GRCh38.json"
+FASTQ_DIR="/Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/example/fastq_samples"
+RNA_STRAND="FR"
+
+# Sample identifiers
+
+SAMPLE_NAME="HumanBrain_01"
+REPLICATE="R1"
+
+echo "=============================================="
+echo "[INFO] Checking and fixing permissions for:"
+echo "       $OUTPUT_DIR"
+echo "=============================================="
+
+# Create directory if missing
+
+if [ ! -d "$OUTPUT_DIR" ]; then
+echo "[INFO] OUTPUT_DIR does not exist — creating it..."
+mkdir -p "$OUTPUT_DIR"
+fi
+
+# Fix directory ownership (requires sudo)
+
+echo "[INFO] Running sudo chown to ensure write access..."
+sudo chown -R $(whoami) "$OUTPUT_DIR"
+
+# Fix permissions
+
+echo "[INFO] Setting directory to u+rwx recursively..."
+chmod -R u+rwx "$OUTPUT_DIR"
+
+echo "[INFO] Permission fix complete!"
+echo "=============================================="
+
+###########################################
+
+# Step 1: Configure MAPIT
+
+###########################################
+$MAPIT_BIN config 
+-v GRCh38 
+-s human 
+-f /Users/hanchoi/PycharmProjects/BINF6310FinalProject/GRCh38.p13.genome.fa 
+-E /Users/hanchoi/PycharmProjects/BINF6310FinalProject/MAPIT-seq/reference/ERCC/ERCC92.fa 
+-o $OUTPUT_DIR 
+-a /Users/hanchoi/PycharmProjects/BINF6310FinalProject/gencode.v40.chr_patch_hapl_scaff.annotation.gff3 
+-r /Users/hanchoi/PycharmProjects/BINF6310FinalProject/rmsk.txt 
+--dbSNP /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/All_20180418.vcf.gz 
+--1000Genomes /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/1000genomes_split_chr 
+--EVSEVA /Users/hanchoi/PycharmProjects/BINF6310FinalProject/dbSNP/GRCh38_SNP/EVS_split_chr 
+--Reditools /Users/hanchoi/PycharmProjects/BINF6310FinalProject/REDItools2 
+--FLARE /Users/hanchoi/PycharmProjects/BINF6310FinalProject/FLARE 
+--overwrite
+
+###########################################
+
+# Step 2: Prepare genome & annotation
+
+###########################################
+$MAPIT_BIN prepare 
+-v GRCh38 
+-n $SAMPLE_NAME 
+-r $REPLICATE 
+-o $OUTPUT_DIR
+
+###########################################
+
+# Step 3: Map sequencing reads
+
+###########################################
+for fq in $FASTQ_DIR/*.fastq; do
+SAMPLE=$(basename $fq .fastq)
+
+```
+echo "[INFO] Mapping: $SAMPLE"
+
+$MAPIT_BIN mapping \
+-v GRCh38 \
+--fq $fq \
+--rna-strandness $RNA_STRAND \
+-n $SAMPLE \
+-r $REPLICATE \
+-o $OUTPUT_DIR
+```
+
+done
+
+###########################################
+
+# Step 4: RNA editing calling
+
+###########################################
+$MAPIT_BIN callediting 
+-v GRCh38 
+--sampleList $FASTQ_DIR/sample_list.txt 
+-o $OUTPUT_DIR 
+--prefix "MAPIT" 
+-e Both
+
+###########################################
+
+# Step 5: Target calling
+
+###########################################
+$MAPIT_BIN calltargets 
+-v GRCh38 
+-i $OUTPUT_DIR/MAPIT_edits.tsv 
+-l Both 
+--treatName TREAT 
+--controlName CONTROL 
+-o $OUTPUT_DIR
+
+###########################################
+
+# Step 6: FLARE analysis
+
+###########################################
+for fq in $FASTQ_DIR/*.fastq; do
+SAMPLE=$(basename $fq .fastq)
+
+```
+$MAPIT_BIN FLARE \
+-v GRCh38 \
+-n $SAMPLE \
+-r $REPLICATE \
+--regions $OUTPUT_DIR/MAPIT_targets.bed \
+-o $OUTPUT_DIR \
+-e AG
+```
+
+done
+
+echo "=============================================="
+echo "[DONE] MAPIT-seq pipeline completed!"
+echo "=============================================="
+
