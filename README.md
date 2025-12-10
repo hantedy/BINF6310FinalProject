@@ -146,5 +146,5 @@ Homer configuration
 perl configureHomer.pl -install hg38
 
 Here is the link to SRA reading and downloads: 
-[
-](https://www.ncbi.nlm.nih.gov/Traces/study/?acc=PRJNA1167221&o=acc_s%3Aa)
+
+(https://www.ncbi.nlm.nih.gov/Traces/study/?acc=PRJNA1167221&o=acc_s%3Aa)
